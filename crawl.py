@@ -1,4 +1,4 @@
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urljoin
 from bs4 import BeautifulSoup, Tag
 
 def normalize_url(url: str) -> str:
@@ -20,10 +20,45 @@ def get_heading_from_html(html: str) -> str:
         return ""
 
 def get_first_paragraph_from_html(html: str) -> str:
-    soup = BeautifulSoup(html)
+    soup = BeautifulSoup(html, "html.parser")
     main_tag = soup.find("main")
     if main_tag:
         main_p = main_tag.find("p")
     else:
         main_p = soup.find("p")
     return main_p.get_text(strip=True) if isinstance(main_p, Tag) else ""
+
+def get_urls_from_html(html: str, base_url: str) -> list:
+    soup = BeautifulSoup(html, "html.parser")
+    urls = soup.find_all("a")
+    abs_urls = []
+
+    for link in urls:
+        href = link.get("href")
+        if not isinstance(href, str) or not href:
+            continue
+        try:
+            absolute_url = urljoin(base_url, href)
+        except ValueError as e:
+            print(f"Error: {e}: {href}")
+            continue
+
+        abs_urls.append(absolute_url)
+    return abs_urls
+
+def get_images_from_html(html: str, base_url: str) -> list:
+    soup = BeautifulSoup(html, "html.parser")
+    img_urls = soup.find_all("img")
+    abs_imgs = []
+    for link in img_urls:
+        src = link.get("src")
+        if not isinstance(src, str) or not src:
+            continue
+        try:
+            absolute_url = urljoin(base_url, src)
+        except ValueError as e:
+            print(f"Error: {e}: {src}")
+            continue
+
+        abs_imgs.append(absolute_url)
+    return abs_imgs
