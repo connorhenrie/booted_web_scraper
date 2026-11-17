@@ -115,12 +115,12 @@ def crawl_page(base_url, current_url=None, page_data=None):
     base_split = urlsplit(base_url)
     current_split = urlsplit(current_url)
     if base_split.netloc != current_split.netloc:
-        return
+        return page_data
 
     # normalize the current URL, check if crawled
     norm_url = normalize_url(current_url)
     if norm_url in page_data:
-        return
+        return page_data
 
     # get HTML from current URL
     print(f"getting HTML from {current_url}")
