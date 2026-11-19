@@ -1,7 +1,9 @@
 import sys
+from turtle import write
 import requests
 import asyncio
 from crawl import crawl_site_async
+from json_report import write_json_report
 
 async def main():
     print("Hello from web-scraper!")
@@ -21,8 +23,7 @@ async def main():
         sys.exit(1)
 
     print(f"found {len(page_data)} pages")
-    for value in page_data.values():
-        print(value)
+    write_json_report(page_data)
 
 if __name__ == "__main__":
     asyncio.run(main())
