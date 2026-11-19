@@ -5,18 +5,17 @@ from crawl import crawl_site_async
 
 async def main():
     print("Hello from web-scraper!")
-    if len(sys.argv) < 2:
-        print("no website provided")
-        sys.exit(1)
-    elif len(sys.argv) > 2:
-        print("too many arguments provided")
+    if len(sys.argv) != 4:
+        print("incorrect number of arguments. Requires URL | concurrency | max pages")
         sys.exit(1)
     else:
         base_url = sys.argv[1]
+        max_concurrenty = int(sys.argv[2])
+        max_pages = int(sys.argv[3])
         print(f"starting crawl of {base_url}")
 
     try:
-        page_data = await crawl_site_async(base_url)
+        page_data = await crawl_site_async(base_url, max_concurrenty, max_pages)
     except Exception as e:
         print(f"Error fetching HTML from {base_url}: {str(e)}")
         sys.exit(1)

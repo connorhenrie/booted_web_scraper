@@ -119,16 +119,19 @@ def extract_page_data(html: str, page_url: str):
 #     for link in outgoing_links:
 #         crawl_page(base_url, link, page_data)
 
-    return page_data
+#    return page_data
 
 class AsyncCrawler:
-    def __init__(self, base_url):
-        self.base_url = base_url
-        self.base_domain = urlsplit(base_url).netloc
-        self.page_data = {}
-        self.visited = set()
+    def __init__(self, base_url, max_concurrenty, max_pages):
+        self.base_url: str = base_url
+        self.base_domain: str = urlsplit(base_url).netloc
+        self.page_data: dict = {}
+        self.visited: set = set()
         self.lock = asyncio.Lock()
-        self.max_concurrency = 10
+        self.max_concurrency: int = max_concurrenty
+        self.max_pages: int = max_pages
+        self.should_stop: bool = False
+        self.all_tasks: set = set()
         self.semaphore = asyncio.Semaphore(self.max_concurrency)
         self.session = None
 
@@ -141,6 +144,12 @@ class AsyncCrawler:
 
     async def add_page_visit(self, normalized_url):
         async with self.lock:
+            if self.should_stop:
+                return False
+            if len(self.visited) >= self.max_pages:
+                self.should_stop = True
+                print("Reached maximum number of pages to crawl")
+                return False
             if normalized_url in self.visited:
                 return False
             else:
@@ -149,6 +158,7 @@ class AsyncCrawler:
 
     async def get_html(self, url) -> str:
         try:
+            print(f"getting HTML from {url}")
             async with self.session.get(url, headers={"User-Agent": "BootCrawler/1.0"}) as resp:
                 if resp.status > 399:
                     raise Exception(f"got HTTP error: {resp.status} {resp.reason}")
@@ -161,35 +171,50 @@ class AsyncCrawler:
 
 
     async def crawl_page(self, current_url):
+        if self.should_stop:
+            return
         if current_url is None:
             return
         # check if current url is same domain as base domain
         if urlsplit(current_url).netloc != self.base_domain:
             return
 
+        # add url to page_visit list to prevent crawling duplicates
         normalized_url = normalize_url(current_url)
         visit_result =  await self.add_page_visit(normalized_url)
         if not visit_result:
             return
 
+        # extract html and data from a webpage
         async with self.semaphore:
             webpage_html = await self.get_html(current_url)
             if webpage_html is None:
                 return
             webpage_data = extract_page_data(webpage_html, current_url)
+
+        # add extracted page data to page_data class
         async with self.lock:
             self.page_data[normalized_url] = webpage_data
+
+        # get outgoing links from webpage
         outgoing_links = webpage_data["outgoing_links"]
+
+        # crawl all outgoing links in a page
         tasks = []
         for link in outgoing_links:
-            tasks.append(asyncio.create_task(self.crawl_page(link)))
+            try:
+                task = asyncio.create_task(self.crawl_page(link))
+                tasks.append(task)
+                self.all_tasks.add(task)
+            finally:
+                self.all_tasks.remove(task)
         await asyncio.gather(*tasks)
 
     async def crawl(self):
         await self.crawl_page(self.base_url)
         return self.page_data
 
-async def crawl_site_async(url):
-    async with AsyncCrawler(url) as crawler:
+async def crawl_site_async(url, concurrency, pages):
+    async with AsyncCrawler(url, concurrency, pages) as crawler:
         await crawler.crawl()
         return crawler.page_data
